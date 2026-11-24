@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nightglow · keep your light alive</title>
+    <meta name="description" content="Collect fireflies to keep your light alive while shadow wisps close in. A small arcade game whose lighting runs in WebAssembly." />
+    <meta name="theme-color" content="#07090f" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="stage" id="stage">
+      <canvas id="screen" aria-label="Nightglow game: a dark meadow with your light, fireflies and shadow wisps"></canvas>
+
+      <header class="hud" id="hud" hidden>
+        <div class="meter-wrap">
+          <span class="hud-label" id="light-label">Light</span>
+          <div class="meter" id="light-meter" role="meter" aria-labelledby="light-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+            <div class="meter-fill" id="light-fill"></div>
+          </div>
+        </div>
+        <p class="hud-stats"><span id="hud-night">Night 1</span><span aria-hidden="true"> · </span><span id="hud-score">0</span></p>
+        <div class="hud-buttons">
+          <button type="button" class="icon-btn" id="sound" aria-pressed="true" aria-label="Sound on">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+          </button>
+          <button type="button" class="icon-btn" id="pause" aria-label="Pause">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <button type="button" class="dash-btn" id="dash" hidden aria-label="Dash">Dash</button>
+      <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+      <section class="panel" id="title" aria-labelledby="title-heading">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="26" fill="url(#halo)"/>
+          <circle cx="32" cy="32" r="7" fill="#fff6dd"/>
+          <circle cx="14" cy="18" r="2.2" fill="#d8ff8a"/><circle cx="50" cy="14" r="1.8" fill="#d8ff8a"/><circle cx="52" cy="46" r="2" fill="#d8ff8a"/>
+          <defs><radialGradient id="halo"><stop offset="0" stop-color="#ffd27a" stop-opacity=".9"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient></defs>
+        </svg>
+        <h1 id="title-heading">Nightglow</h1>
+        <p class="lede">Your light fades in the dark. Catch fireflies to keep it burning, and keep the shadow wisps away. They fear a bright light.</p>
+        <ul class="howto">
+          <li><b>Move</b> <span class="keys">arrows or WASD</span><span class="touch">drag anywhere</span></li>
+          <li><b>Dash</b> <span class="keys">Space</span><span class="touch">the Dash button</span>, costs a little light</li>
+          <li><b>Pause</b> <span class="keys">Esc or P</span><span class="touch">the pause button</span></li>
+        </ul>
+        <button type="button" class="primary" id="play">Play</button>
+        <p class="best" id="best-title"></p>
+      </section>
+
+      <section class="panel" id="paused" hidden aria-labelledby="paused-heading">
+        <h2 id="paused-heading">Paused</h2>
+        <button type="button" class="primary" id="resume">Resume</button>
+        <button type="button" class="secondary" id="quit">End this run</button>
+      </section>
+
+      <section class="panel" id="over" hidden aria-labelledby="over-heading">
+        <h2 id="over-heading">Your light went out</h2>
+        <p class="final" id="final-score"></p>
+        <dl class="facts">
+          <div><dt>Night</dt><dd id="final-night"></dd></div>
+          <div><dt>Fireflies</dt><dd id="final-fireflies"></dd></div>
+          <div><dt>Time</dt><dd id="final-time"></dd></div>
+        </dl>
+        <p class="best" id="best-over"></p>
+        <button type="button" class="primary" id="again">Play again</button>
+      </section>
+
+      <noscript><p class="panel">Nightglow needs JavaScript and WebAssembly.</p></noscript>
+    </main>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

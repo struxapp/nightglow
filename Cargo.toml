@@ -1,0 +1,17 @@
+[package]
+name = "nightglow"
+version = "1.0.0"
+edition = "2021"
+license = "MIT"
+description = "Nightglow: keep your light alive in a dark meadow. The game and its per-pixel lighting run in WebAssembly."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
