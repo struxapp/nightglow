@@ -275,6 +275,8 @@ function frame(now) {
     }
     if (events & EVENT.over) {
       sounds.over();
+      // No Dash button over the fading light.
+      $('dash').hidden = true;
       // Let the light fade out first; a new run started meanwhile cancels this.
       const ended = run;
       setTimeout(() => {

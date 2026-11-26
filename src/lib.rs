@@ -44,9 +44,8 @@ pub extern "C" fn start(seed: u32) {
 /// Does nothing outside a run.
 #[no_mangle]
 pub extern "C" fn end_run() {
-    with(|g| {
-        g.end_run();
-    });
+    // The page only calls this during a run, so whether a run was going is not needed here.
+    let _ = with(|g| g.end_run());
 }
 
 /// 1 when the player asked for reduced motion (`prefers-reduced-motion`): no screen shake, flicker or blinking.
