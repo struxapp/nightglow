@@ -72,7 +72,7 @@ function fit() {
   const h = Math.min(480, Math.max(120, Math.floor(height / pixel)));
   // The module skips the work when the size is the same, and draws a frame at the new size straight away.
   game.resize(w, h, GROUND_SEED);
-  if (canvas.width !== game.width() || canvas.height !== game.height()) {
+  if (!image || image.width !== game.width() || image.height !== game.height()) {
     canvas.width = game.width();
     canvas.height = game.height();
     image = new ImageData(game.width(), game.height());
