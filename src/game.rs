@@ -180,7 +180,8 @@ impl Game {
             shake: 0.0,
             reduced_motion: false,
         };
-        for _ in 0..8 {
+        // The title scene gets more fireflies, so the meadow shows behind the start card.
+        for _ in 0..14 {
             let f = game.new_firefly(0.0);
             game.fireflies.push(f);
         }

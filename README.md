@@ -24,7 +24,7 @@ lights hold still instead of flickering, and the player dims instead of blinking
 The whole game, simulation and rendering, is Rust compiled to WebAssembly (`src/`): every frame it lights the
 meadow pixel by pixel from your light, the fireflies and the sparks, then draws the wisps on top. The page
 (`web/app.js`) only passes input in, copies the pixels to a canvas and plays the sounds (`web/sound.js`, Web Audio,
-no sound files). The module has no imports and is about 69 KB; it needs no special headers (no threads, no
+no sound files). The module has no imports and is about 72 KB; it needs no special headers (no threads, no
 SharedArrayBuffer).
 
 ## Run it
