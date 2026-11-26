@@ -1,5 +1,7 @@
 # Nightglow
 
+![Nightglow mid-run: the golden light, fireflies and a shadow wisp at its edge](docs/screenshot-dark.png)
+
 Nightglow is a small arcade game. Your light fades in the dark: catch fireflies to keep it burning, and keep the
 shadow wisps away. They hunt you, but they fear a bright light, so the brighter you burn, the safer you are.
 Every 25 seconds a new night begins: more wisps, faster wisps, and a light that fades a little quicker.
@@ -10,8 +12,6 @@ Every 25 seconds a new night begins: more wisps, faster wisps, and a light that 
 - Score: 10 points a second, 50 a firefly. Your best score and the sound setting stay in this browser
   (localStorage keys `nightglow:best` and `nightglow:sound`). No accounts, no tracking, no network calls after the
   page has loaded.
-
-Screenshots: [docs/screenshot-dark.png](docs/screenshot-dark.png)
 
 ## Accessibility
 
@@ -60,8 +60,8 @@ oxlint runs through `npx` at a pinned version, so the repository needs no `packa
 - `src/game/render.rs`: the software renderer: the meadow, the lighting and the sprites.
 - `web/app.js`: loading, input (keyboard, pointer and touch), the frame loop, menus and the HUD.
 - `web/sound.js`: the sounds.
-- `icon.svg` is the app's listing icon; `web/favicon.svg` is the same image, inside the served folder, as the page's
-  favicon.
+- `icon.svg` is the app's listing icon, and `docs/icon.png` is the same at 512 px. `web/favicon.svg` is the same
+  image again, inside the served folder, as the page's favicon. `docs/` also holds the screenshots.
 
 ## Licences
 

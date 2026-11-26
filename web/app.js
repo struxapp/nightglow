@@ -172,15 +172,17 @@ const hasTouch = () => matchMedia('(any-pointer: coarse)').matches || navigator.
 
 // ------------------------------------------------------------ Screens
 
-function show(panel) {
+// `focus`: move the focus to the panel's main button. Not on page load, where a focus ring on Play would greet every
+// visitor; Tab reaches Play first.
+function show(panel, focus = true) {
   for (const id of ['title', 'paused', 'over']) $(id).hidden = id !== panel;
   const playing = panel === null;
   $('hud').hidden = !(playing || panel === 'paused');
   $('dash').hidden = !playing || !hasTouch();
   if (panel === 'title') $('best-title').textContent = bestText() || 'No best score yet';
-  if (panel) {
+  if (panel && focus) {
     $(panel).querySelector('button.primary')?.focus();
-  } else if (document.activeElement instanceof HTMLElement && document.activeElement.closest('.panel')) {
+  } else if (!panel && document.activeElement instanceof HTMLElement && document.activeElement.closest('.panel')) {
     // Don't leave the focus on a button that was just hidden.
     document.activeElement.blur();
   }
@@ -343,7 +345,7 @@ async function main() {
     // A click is a user gesture, so audio may start here when sound was off at Play.
     if (soundOn) wakeAudio();
   });
-  show('title');
+  show('title', false);
   requestAnimationFrame(frame);
 }
 
