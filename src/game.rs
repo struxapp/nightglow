@@ -150,6 +150,8 @@ pub struct Game {
     collected: u32,
     night: u32,
     shake: f32,
+    /// The player asked for reduced motion: no shake, no flicker, no blinking.
+    reduced_motion: bool,
 }
 
 impl Game {
@@ -176,6 +178,7 @@ impl Game {
             collected: 0,
             night: 1,
             shake: 0.0,
+            reduced_motion: false,
         };
         for _ in 0..8 {
             let f = game.new_firefly(0.0);
@@ -250,6 +253,11 @@ impl Game {
         self.pvx = 0.0;
         self.pvy = 0.0;
         true
+    }
+
+    /// Honours the player's reduced-motion setting: no screen shake, no light flicker, no blinking.
+    pub fn set_reduced_motion(&mut self, on: bool) {
+        self.reduced_motion = on;
     }
 
     pub fn pixels(&self) -> &[u8] {
@@ -810,6 +818,61 @@ mod tests {
         assert!(!game.end_run());
         game.start(19);
         assert_eq!(game.state(), State::Playing);
+    }
+
+    /// A run just hit by a wisp: shaking and blinking.
+    fn just_hit(reduced_motion: bool) -> Game {
+        let mut game = empty_run(20);
+        game.set_reduced_motion(reduced_motion);
+        game.invulnerable = 0.0;
+        game.wisps.push(Wisp { x: game.px + 2.0, y: game.py, vx: 0.0, vy: 0.0, phase: 0.0 });
+        assert!(game.tick(STEP, 0.0, 0.0, false).has(Event::Hit));
+        game
+    }
+
+    #[test]
+    fn a_hit_shakes_and_blinks() {
+        let mut game = just_hit(false);
+        let mut shaken = false;
+        let mut alphas = Vec::new();
+        for _ in 0..20 {
+            game.tick(STEP, 0.0, 0.0, false);
+            shaken |= game.camera_offset() != (0.0, 0.0);
+            alphas.push(game.player_alpha());
+        }
+        assert!(shaken);
+        assert!(alphas.contains(&0.0) && alphas.contains(&1.0));
+    }
+
+    #[test]
+    fn reduced_motion_means_no_shake_and_no_blinking() {
+        let mut game = just_hit(true);
+        for _ in 0..20 {
+            game.tick(STEP, 0.0, 0.0, false);
+            assert_eq!(game.camera_offset(), (0.0, 0.0));
+            assert_eq!(game.player_alpha(), 0.5);
+        }
+    }
+
+    /// Whether a frame changes when only the flicker clocks move on.
+    fn flickers(reduced_motion: bool) -> bool {
+        let mut game = empty_run(21);
+        game.set_reduced_motion(reduced_motion);
+        game.tick(STEP, 0.0, 0.0, false);
+        game.invulnerable = 0.0;
+        game.particles.clear();
+        game.render();
+        let before = game.pixels().to_vec();
+        game.clock += 0.37;
+        game.fireflies.iter_mut().for_each(|f| f.phase += 0.37);
+        game.render();
+        game.pixels() != &before[..]
+    }
+
+    #[test]
+    fn reduced_motion_holds_the_lights_still() {
+        assert!(flickers(false));
+        assert!(!flickers(true));
     }
 
     #[test]

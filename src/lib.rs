@@ -49,6 +49,12 @@ pub extern "C" fn end_run() {
     });
 }
 
+/// 1 when the player asked for reduced motion (`prefers-reduced-motion`): no screen shake, flicker or blinking.
+#[no_mangle]
+pub extern "C" fn set_reduced_motion(on: u32) {
+    with(|g| g.set_reduced_motion(on != 0));
+}
+
 /// Advances the game by `dt_ms` and draws a frame. `x`/`y` is the steering direction (-1..1 each);
 /// `dash` is 1 on the frame the dash key or button is pressed. Returns the event bits (see the table above).
 #[no_mangle]

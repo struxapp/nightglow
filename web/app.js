@@ -319,6 +319,11 @@ async function main() {
     $('play').disabled = true;
     return;
   }
+  // No screen shake, flicker or blinking for players who asked for reduced motion.
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const applyMotion = () => game.set_reduced_motion(reducedMotion.matches ? 1 : 0);
+  applyMotion();
+  reducedMotion.addEventListener('change', applyMotion);
   fit();
   window.addEventListener('resize', fit);
   setSound(soundOn);

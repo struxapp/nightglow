@@ -149,30 +149,50 @@ impl Frame {
 }
 
 impl Game {
-    /// How far the hit shake moves the scene this frame.
+    /// How far the hit shake moves the scene this frame. No shake when the player asked for reduced motion.
     pub(super) fn camera_offset(&self) -> (f32, f32) {
-        if self.shake <= 0.0 {
+        if self.shake <= 0.0 || self.reduced_motion {
             return (0.0, 0.0);
         }
         let t = self.clock;
         ((t * 91.0).sin() * self.shake * 6.0, (t * 77.0).cos() * self.shake * 6.0)
     }
 
+    /// How strongly the player's core is drawn: it blinks while it can't be hit, or, with reduced motion, it is
+    /// drawn at half strength instead of blinking.
+    pub(super) fn player_alpha(&self) -> f32 {
+        let visible = self.state == State::Playing || (self.state == State::Over && self.over_time < 0.6);
+        if !visible {
+            0.0
+        } else if self.invulnerable <= 0.0 {
+            1.0
+        } else if self.reduced_motion {
+            0.5
+        } else if (self.clock * 20.0).sin() < 0.0 {
+            0.0
+        } else {
+            1.0
+        }
+    }
+
     pub(super) fn render(&mut self) {
         let t = self.clock;
         let (ox, oy) = self.camera_offset();
         let light_radius = self.light_radius();
+        let player_alpha = self.player_alpha();
+        // With reduced motion every flicker holds still at its usual brightness.
+        let still = self.reduced_motion;
         let frame = &mut self.frame;
 
         // Light: the ambient night, the fireflies, the player and the sparks.
         frame.clear_light(if self.state == State::Title { [0.09, 0.10, 0.17] } else { [0.05, 0.06, 0.11] });
         for f in &self.fireflies {
-            let flicker = 0.75 + 0.25 * (f.phase * 7.0).sin();
+            let flicker = if still { 0.75 } else { 0.75 + 0.25 * (f.phase * 7.0).sin() };
             frame.add_light(f.x + ox, f.y + oy, 15.0, [0.75, 1.0, 0.45], 0.75 * flicker);
         }
         if self.state != State::Title {
             let fade = if self.state == State::Over { (1.0 - self.over_time * 0.8).max(0.0) } else { 1.0 };
-            let flicker = 0.92 + 0.08 * (t * 13.0).sin() * (t * 7.3).cos();
+            let flicker = if still { 0.92 } else { 0.92 + 0.08 * (t * 13.0).sin() * (t * 7.3).cos() };
             let radius = light_radius * fade.max(0.25);
             frame.add_light(self.px + ox, self.py + oy, radius, [1.0, 0.82, 0.55], 1.25 * flicker * fade.max(0.1));
         }
@@ -203,7 +223,7 @@ impl Game {
         }
 
         for f in &self.fireflies {
-            let flicker = 0.7 + 0.3 * (f.phase * 7.0).sin();
+            let flicker = if still { 0.85 } else { 0.7 + 0.3 * (f.phase * 7.0).sin() };
             let (x, y) = ((f.x + ox) as i32, (f.y + oy) as i32);
             frame.plot(x, y, [0.9, 1.0, 0.6], flicker);
             frame.plot(x + 1, y, [0.7, 0.9, 0.4], flicker * 0.5);
@@ -213,17 +233,15 @@ impl Game {
             frame.plot((p.x + ox) as i32, (p.y + oy) as i32, p.color, k);
         }
 
-        // The player: a small bright core that blinks while it can't be hit.
-        let visible = self.state == State::Playing || (self.state == State::Over && self.over_time < 0.6);
-        let blink = self.invulnerable > 0.0 && (t * 20.0).sin() < 0.0;
-        if visible && !blink {
+        // The player: a small bright core.
+        if player_alpha > 0.0 {
             let (cx, cy) = ((self.px + ox) as i32, (self.py + oy) as i32);
             for y in -2i32..=2 {
                 for x in -2i32..=2 {
                     let d = x * x + y * y;
                     if d <= 5 {
                         let core = if d <= 1 { [1.0, 1.0, 0.92] } else { [1.0, 0.85, 0.55] };
-                        frame.plot(cx + x, cy + y, core, 1.0);
+                        frame.plot(cx + x, cy + y, core, player_alpha);
                     }
                 }
             }
