@@ -15,6 +15,9 @@ let image;
 let paused = false;
 let last = performance.now();
 let dashQueued = false;
+// Counts runs, so a late game-over timer from an earlier run is ignored.
+let run = 0;
+let overShown = false;
 const keys = new Set();
 const stick = {active: false, id: -1, x0: 0, y0: 0, x: 0, y: 0};
 
@@ -193,28 +196,40 @@ function bestText() {
   return value ? `Best: ${value.toLocaleString('en')}` : '';
 }
 
+function setPaused(value) {
+  paused = value;
+  $('pause').setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+  last = performance.now();
+}
+
 function play() {
   ensureAudio();
   game.start((Math.random() * 0xffffffff) >>> 0 || 1);
-  paused = false;
+  run += 1;
+  overShown = false;
+  setPaused(false);
   keys.clear();
   show(null);
   canvas.focus?.();
 }
 
 function togglePause() {
-  paused = !paused;
+  setPaused(!paused);
   show(paused ? 'paused' : null);
-  $('pause').setAttribute('aria-label', paused ? 'Resume' : 'Pause');
-  last = performance.now();
 }
 
+// The player quit: the game itself stops (so nothing keeps running behind the panel), then the results show.
 function endRun() {
-  paused = false;
-  showOver();
+  game.end_run();
+  setPaused(false);
+  showOver(true);
 }
 
-function showOver() {
+// Shows the results of the current run once, and saves the best score once.
+function showOver(quit) {
+  if (overShown) return;
+  overShown = true;
+  $('over-heading').textContent = quit ? 'Run ended' : 'Your light went out';
   const score = game.score();
   const previous = best();
   if (score > previous) write(BEST_KEY, String(score));
@@ -265,7 +280,11 @@ function frame(now) {
     }
     if (events & EVENT.over) {
       sounds.over();
-      setTimeout(showOver, 1200);
+      // Let the light fade out first; a new run started meanwhile cancels this.
+      const ended = run;
+      setTimeout(() => {
+        if (ended === run) showOver(false);
+      }, 1200);
     }
     // The wasm memory can grow, so the view is made again each frame.
     const bytes = new Uint8ClampedArray(game.memory.buffer, game.frame_ptr(), game.width() * game.height() * 4);

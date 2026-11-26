@@ -239,6 +239,19 @@ impl Game {
         }
     }
 
+    /// Ends the run now (the player quit): the game stops as when the light goes out, but with no game-over event.
+    /// Returns false, and changes nothing, when no run is going.
+    pub fn end_run(&mut self) -> bool {
+        if self.state != State::Playing {
+            return false;
+        }
+        self.state = State::Over;
+        self.over_time = 0.0;
+        self.pvx = 0.0;
+        self.pvy = 0.0;
+        true
+    }
+
     pub fn pixels(&self) -> &[u8] {
         &self.frame.pixels
     }
@@ -766,6 +779,37 @@ mod tests {
         assert_eq!(game.light(), MAX_LIGHT);
         assert_eq!(game.wisps.len(), 2);
         assert!(game.particles.is_empty());
+    }
+
+    #[test]
+    fn ending_a_run_stops_the_game() {
+        let mut game = Game::new(320, 240, 17);
+        game.start(17);
+        run(&mut game, 2.0, 1.0, 0.0);
+        let (score, light, x, y) = (game.score(), game.light(), game.px, game.py);
+        assert!(game.end_run());
+        assert_eq!(game.state(), State::Over);
+        // Nothing moves, scores or makes a sound after the player quit, whatever they press.
+        game.wisps.iter_mut().for_each(|wisp| (wisp.x, wisp.y) = (x, y));
+        let mut events = Events::default();
+        for _ in 0..(60 * 5) {
+            events |= game.tick(STEP, -1.0, 1.0, true);
+        }
+        assert_eq!(events, Events::default());
+        assert_eq!((game.score(), game.light(), game.px, game.py), (score, light, x, y));
+        assert_eq!(game.state(), State::Over);
+    }
+
+    #[test]
+    fn ending_a_run_outside_a_run_does_nothing() {
+        let mut game = Game::new(320, 240, 18);
+        assert!(!game.end_run());
+        assert_eq!(game.state(), State::Title);
+        game.start(18);
+        assert!(game.end_run());
+        assert!(!game.end_run());
+        game.start(19);
+        assert_eq!(game.state(), State::Playing);
     }
 
     #[test]

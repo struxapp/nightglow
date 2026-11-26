@@ -40,6 +40,15 @@ pub extern "C" fn start(seed: u32) {
     with(|g| g.start(seed));
 }
 
+/// Ends the current run (the player quit). The game stops as at game over, with no game-over event.
+/// Does nothing outside a run.
+#[no_mangle]
+pub extern "C" fn end_run() {
+    with(|g| {
+        g.end_run();
+    });
+}
+
 /// Advances the game by `dt_ms` and draws a frame. `x`/`y` is the steering direction (-1..1 each);
 /// `dash` is 1 on the frame the dash key or button is pressed. Returns the event bits (see the table above).
 #[no_mangle]
