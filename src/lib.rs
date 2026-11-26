@@ -3,10 +3,20 @@
 //! The page calls `resize` with the size of the pixel buffer it wants, then `tick` once a frame with the time passed
 //! and the player's input, and copies `frame_ptr()` (RGBA, `width × height`) onto a canvas. `tick` returns sound
 //! events as bit flags; everything else the page shows is read through small getters.
+//!
+//! Numbers shared with the page (`web/app.js` mirrors them in `STATE` and `EVENT`; a test pins them):
+//!
+//! | `state()` | meaning   |     | `tick()` bit | event     |
+//! |-----------|-----------|-----|--------------|-----------|
+//! | 0         | title     |     | 1            | pickup    |
+//! | 1         | playing   |     | 2            | hit       |
+//! | 2         | game over |     | 4            | dash      |
+//! |           |           |     | 8            | new night |
+//! |           |           |     | 16           | game over |
 
 mod game;
 
-pub use game::{Game, EVENT_DASH, EVENT_GAME_OVER, EVENT_HIT, EVENT_NIGHT, EVENT_PICKUP};
+pub use game::{Event, Events, Game, State};
 
 use std::cell::RefCell;
 
@@ -18,22 +28,23 @@ fn with<T>(f: impl FnOnce(&mut Game) -> T) -> T {
     GAME.with(|game| f(&mut game.borrow_mut()))
 }
 
-/// Sets the pixel buffer size (clamped to 160..=480 × 120..=480) and starts the title scene.
+/// Sets the pixel buffer size (clamped to 160..=480 × 120..=480) and draws a frame at that size.
 #[no_mangle]
 pub extern "C" fn resize(width: u32, height: u32, seed: u32) {
     with(|g| g.resize(width as usize, height as usize, seed));
 }
 
+/// Starts a new run.
 #[no_mangle]
 pub extern "C" fn start(seed: u32) {
     with(|g| g.start(seed));
 }
 
 /// Advances the game by `dt_ms` and draws a frame. `x`/`y` is the steering direction (-1..1 each);
-/// `dash` is 1 on the frame the dash key or button is pressed.
+/// `dash` is 1 on the frame the dash key or button is pressed. Returns the event bits (see the table above).
 #[no_mangle]
 pub extern "C" fn tick(dt_ms: f32, x: f32, y: f32, dash: u32) -> u32 {
-    with(|g| g.tick(dt_ms / 1000.0, x, y, dash != 0))
+    with(|g| g.tick(dt_ms / 1000.0, x, y, dash != 0).bits())
 }
 
 #[no_mangle]
@@ -54,7 +65,7 @@ pub extern "C" fn height() -> u32 {
 /// 0 title, 1 playing, 2 game over.
 #[no_mangle]
 pub extern "C" fn state() -> u32 {
-    with(|g| g.state())
+    with(|g| g.state() as u32)
 }
 
 #[no_mangle]

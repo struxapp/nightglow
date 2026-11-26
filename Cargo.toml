@@ -15,3 +15,7 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# The tests tick the renderer thousands of times; an optimised build keeps `cargo test` quick.
+[profile.test]
+opt-level = 2
