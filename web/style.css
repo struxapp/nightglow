@@ -153,10 +153,11 @@ button {
   display: none;
 }
 
+/* Sits above the bottom-right corner, which stays clear (about 56 px) for the hosting site's return button. */
 .dash-btn {
   position: absolute;
-  right: max(20px, env(safe-area-inset-right));
-  bottom: max(24px, env(safe-area-inset-bottom));
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(72px + env(safe-area-inset-bottom));
   width: 88px;
   height: 88px;
   border: 2px solid rgb(255 207 107 / 0.6);
@@ -191,6 +192,7 @@ button {
   position: relative;
   width: min(440px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
   overflow: auto;
   padding: 28px 26px 24px;
   border: 1px solid var(--border);
@@ -243,7 +245,7 @@ h2 {
   display: none;
 }
 
-@media (pointer: coarse) {
+@media (pointer: coarse), (hover: none) {
   .keys {
     display: none;
   }
@@ -314,6 +316,18 @@ h2 {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
+}
+
+/* Phones: keep the bottom-right corner clear for the hosting site's return button. */
+@media (max-width: 600px) {
+  .stage {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+
+  .panel {
+    max-height: calc(100vh - 32px - 56px);
+    max-height: calc(100dvh - 32px - 56px - env(safe-area-inset-bottom));
+  }
 }
 
 @media (max-width: 520px) {

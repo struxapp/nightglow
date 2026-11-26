@@ -1,14 +1,22 @@
 // Nightglow's page: loads the WebAssembly game, feeds it input every frame, copies its pixels to the canvas,
 // plays its sounds and shows the menus and the HUD. The game itself (simulation and lighting) is nightglow.wasm.
 
+import {setSoundEnabled, sounds, wakeAudio} from './sound.js';
+
 const $ = (id) => document.getElementById(id);
 const canvas = $('screen');
 const context = canvas.getContext('2d', {alpha: false});
 
-const EVENT = {pickup: 1, hit: 2, dash: 4, night: 8, over: 16};
+// The numbers the module uses for its state and its event bits: the table in src/lib.rs (a Rust test pins them).
 const STATE = {title: 0, playing: 1, over: 2};
+const EVENT = {pickup: 1, hit: 2, dash: 4, night: 8, over: 16};
+
 const BEST_KEY = 'nightglow:best';
 const SOUND_KEY = 'nightglow:sound';
+// The meadow looks the same on every visit.
+const GROUND_SEED = 20251124;
+const MOVE_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyA', 'KeyS', 'KeyD']);
+const DASH_KEYS = new Set(['Space', 'ShiftLeft', 'ShiftRight', 'KeyJ']);
 
 let game;
 let image;
@@ -41,64 +49,16 @@ function write(key, value) {
 
 const best = () => Number(read(BEST_KEY) ?? 0) || 0;
 
-// ------------------------------------------------------------ Sound (made with Web Audio, no files)
+// ------------------------------------------------------------ Sound
 
-let audio = null;
 let soundOn = read(SOUND_KEY) !== 'off';
-
-function ensureAudio() {
-  if (!audio && soundOn) {
-    const Context = window.AudioContext ?? window.webkitAudioContext;
-    if (Context) audio = new Context();
-  }
-  if (audio?.state === 'suspended') void audio.resume();
-}
-
-function tone(frequency, start, duration, volume, type = 'sine', slideTo = null) {
-  if (!audio || !soundOn) return;
-  const t = audio.currentTime + start;
-  const osc = audio.createOscillator();
-  const gain = audio.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(frequency, t);
-  if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + duration);
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(volume, t + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-  osc.connect(gain).connect(audio.destination);
-  osc.start(t);
-  osc.stop(t + duration + 0.02);
-}
-
-const sounds = {
-  pickup() {
-    tone(880, 0, 0.12, 0.08);
-    tone(1320, 0.06, 0.16, 0.07);
-  },
-  hit() {
-    tone(160, 0, 0.35, 0.18, 'triangle', 55);
-  },
-  dash() {
-    tone(300, 0, 0.18, 0.06, 'sawtooth', 900);
-  },
-  night() {
-    tone(196, 0, 1.4, 0.07);
-    tone(293.7, 0.05, 1.4, 0.05);
-  },
-  over() {
-    tone(392, 0, 0.4, 0.08, 'triangle');
-    tone(311, 0.25, 0.5, 0.08, 'triangle');
-    tone(196, 0.55, 0.9, 0.09, 'triangle');
-  },
-};
 
 function setSound(on) {
   soundOn = on;
-  write(SOUND_KEY, on ? 'on' : 'off');
+  setSoundEnabled(on);
   const button = $('sound');
   button.setAttribute('aria-pressed', String(on));
   button.setAttribute('aria-label', on ? 'Sound on' : 'Sound off');
-  if (on) ensureAudio();
 }
 
 // ------------------------------------------------------------ Size: a pixel buffer that fills the screen
@@ -110,10 +70,33 @@ function fit() {
   const pixel = Math.min(6, Math.max(2, Math.round(Math.min(width, height) / 200)));
   const w = Math.min(480, Math.max(160, Math.floor(width / pixel)));
   const h = Math.min(480, Math.max(120, Math.floor(height / pixel)));
-  game.resize(w, h, 20251124);
-  canvas.width = game.width();
-  canvas.height = game.height();
-  image = new ImageData(game.width(), game.height());
+  // The module skips the work when the size is the same, and draws a frame at the new size straight away.
+  game.resize(w, h, GROUND_SEED);
+  if (canvas.width !== game.width() || canvas.height !== game.height()) {
+    canvas.width = game.width();
+    canvas.height = game.height();
+    image = new ImageData(game.width(), game.height());
+  }
+  // Paint now: resizing clears the canvas, and a paused game draws no frames.
+  draw();
+}
+
+// Resize events come in bursts while a window is dragged: fit once per animation frame at most.
+let fitQueued = false;
+function queueFit() {
+  if (fitQueued) return;
+  fitQueued = true;
+  requestAnimationFrame(() => {
+    fitQueued = false;
+    fit();
+  });
+}
+
+function draw() {
+  // The wasm memory can grow, so the view is made again each time.
+  const bytes = new Uint8ClampedArray(game.memory.buffer, game.frame_ptr(), game.width() * game.height() * 4);
+  image.data.set(bytes);
+  context.putImageData(image, 0, 0);
 }
 
 // ------------------------------------------------------------ Input
@@ -136,15 +119,18 @@ function direction() {
 }
 
 window.addEventListener('keydown', (event) => {
+  if (!game) return;
   if (event.code === 'Escape' || event.code === 'KeyP') {
-    if (game.state() === STATE.playing) togglePause();
+    // Holding the key must not flicker between paused and playing.
+    if (!event.repeat && game.state() === STATE.playing) togglePause();
     return;
   }
   if (game.state() !== STATE.playing || paused) return;
-  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(event.code)) event.preventDefault();
-  if ((event.code === 'Space' || event.code === 'ShiftLeft' || event.code === 'ShiftRight' || event.code === 'KeyJ') && !event.repeat) {
-    dashQueued = true;
-  }
+  // Space and Enter on a focused button (sound, pause) press that button; they don't also dash.
+  const onButton = event.target instanceof Element && event.target.closest('button');
+  if (onButton && (event.code === 'Space' || event.code === 'Enter')) return;
+  if (MOVE_KEYS.has(event.code) || DASH_KEYS.has(event.code)) event.preventDefault();
+  if (DASH_KEYS.has(event.code) && !event.repeat) dashQueued = true;
   keys.add(event.code);
 });
 window.addEventListener('keyup', (event) => keys.delete(event.code));
@@ -181,14 +167,23 @@ $('dash').addEventListener('pointerdown', (event) => {
   dashQueued = true;
 });
 
+// A touch screen, even on a laptop whose main pointer is a mouse or touchpad.
+const hasTouch = () => matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+
 // ------------------------------------------------------------ Screens
 
 function show(panel) {
   for (const id of ['title', 'paused', 'over']) $(id).hidden = id !== panel;
   const playing = panel === null;
   $('hud').hidden = !(playing || panel === 'paused');
-  $('dash').hidden = !playing || !matchMedia('(pointer: coarse)').matches;
-  if (panel) $(panel).querySelector('button.primary')?.focus();
+  $('dash').hidden = !playing || !hasTouch();
+  if (panel === 'title') $('best-title').textContent = bestText() || 'No best score yet';
+  if (panel) {
+    $(panel).querySelector('button.primary')?.focus();
+  } else if (document.activeElement instanceof HTMLElement && document.activeElement.closest('.panel')) {
+    // Don't leave the focus on a button that was just hidden.
+    document.activeElement.blur();
+  }
 }
 
 function bestText() {
@@ -203,14 +198,14 @@ function setPaused(value) {
 }
 
 function play() {
-  ensureAudio();
+  wakeAudio();
   game.start((Math.random() * 0xffffffff) >>> 0 || 1);
   run += 1;
   overShown = false;
   setPaused(false);
   keys.clear();
+  dashQueued = false;
   show(null);
-  canvas.focus?.();
 }
 
 function togglePause() {
@@ -286,10 +281,7 @@ function frame(now) {
         if (ended === run) showOver(false);
       }, 1200);
     }
-    // The wasm memory can grow, so the view is made again each frame.
-    const bytes = new Uint8ClampedArray(game.memory.buffer, game.frame_ptr(), game.width() * game.height() * 4);
-    image.data.set(bytes);
-    context.putImageData(image, 0, 0);
+    draw();
     if (game.state() === STATE.playing) updateHud();
   }
   requestAnimationFrame(frame);
@@ -297,17 +289,29 @@ function frame(now) {
 
 // ------------------------------------------------------------ Start
 
+class StartError extends Error {
+  constructor(message, cause) {
+    super(message, {cause});
+    this.name = 'StartError';
+  }
+}
+
 async function load() {
   const url = new URL('nightglow.wasm', import.meta.url);
-  let instance;
+  let bytes;
   try {
-    ({instance} = await WebAssembly.instantiateStreaming(fetch(url), {}));
-  } catch {
-    // A server that sends another content type than application/wasm: fall back to bytes.
-    const bytes = await (await fetch(url)).arrayBuffer();
-    ({instance} = await WebAssembly.instantiate(bytes, {}));
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    bytes = await response.arrayBuffer();
+  } catch (error) {
+    throw new StartError('Nightglow could not load its game file. Check your connection and reload the page.', error);
   }
-  return instance.exports;
+  try {
+    const {instance} = await WebAssembly.instantiate(bytes, {});
+    return instance.exports;
+  } catch (error) {
+    throw new StartError('Nightglow could not start: this browser cannot run WebAssembly.', error);
+  }
 }
 
 async function main() {
@@ -315,7 +319,7 @@ async function main() {
     game = await load();
   } catch (error) {
     console.error(error);
-    $('title').querySelector('.lede').textContent = 'Nightglow could not start: this browser cannot run WebAssembly.';
+    $('title').querySelector('.lede').textContent = error instanceof StartError ? error.message : String(error);
     $('play').disabled = true;
     return;
   }
@@ -325,15 +329,18 @@ async function main() {
   applyMotion();
   reducedMotion.addEventListener('change', applyMotion);
   fit();
-  window.addEventListener('resize', fit);
+  window.addEventListener('resize', queueFit);
   setSound(soundOn);
-  $('best-title').textContent = bestText();
   $('play').addEventListener('click', play);
   $('again').addEventListener('click', play);
   $('resume').addEventListener('click', togglePause);
   $('quit').addEventListener('click', endRun);
   $('pause').addEventListener('click', togglePause);
-  $('sound').addEventListener('click', () => setSound(!soundOn));
+  $('sound').addEventListener('click', () => {
+    setSound(!soundOn);
+    // A click is a user gesture, so audio may start here when sound was off at Play.
+    if (soundOn) wakeAudio();
+  });
   show('title');
   requestAnimationFrame(frame);
 }
